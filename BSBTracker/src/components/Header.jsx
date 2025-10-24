@@ -1,101 +1,45 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "../data/supabaseClient";
+import { Link, NavLink } from "react-router-dom";
 import logo from "../assets/BlueSwan_Logo.jpg";
-import { FaHome, FaUser, FaCalendarAlt, FaTools } from "react-icons/fa";
+
+const links = [
+  { to: "/", label: "Home" },
+  { to: "/leaderboard", label: "Leaderboard" },
+  { to: "/events", label: "Events" },
+  { to: "/routes", label: "Routes" },
+];
 
 export default function Header() {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Put this AFTER all hooks
-  const hideHeader =
-    location.pathname === "/" || location.pathname.startsWith("/leaderboard");
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
-      if (!error && user) {
-        setUser(user);
-        const { data, error: profileError } = await supabase
-          .from("users")
-          .select("is_admin")
-          .eq("id", user.id)
-          .single();
-
-        if (!profileError && data?.is_admin) {
-          setIsAdmin(true);
-        }
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  if (hideHeader) return null;
-
-  const navigation = [
-    ...(isAdmin
-      ? [{ href: "/admin/dashboard", icon: FaTools, key: "admin" }]
-      : []),
-    { href: "/dashboard", icon: FaHome, key: "dashboard" },
-    { href: "/events", icon: FaCalendarAlt, key: "events" },
-    { href: "/profile", icon: FaUser, key: "profile" },
-  ];
-
   return (
-    <>
-      {/* Desktop Header */}
-      <nav className="hidden md:flex bg-white shadow-sm fixed top-0 w-full z-50 px-6 py-3 items-center justify-between">
-        <Link to={user ? "/dashboard" : "/"}>
-          <img
-            className="h-8 w-auto sm:h-10"
-            src={logo}
-            alt="BSBTracker Logo"
-          />
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur border-b border-blue-100">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <Link to="/" className="flex items-center gap-3">
+          <img src={logo} alt="Blue Swan Tracker" className="h-10 w-10 rounded-full object-cover" />
+          <span className="font-semibold text-slate-900 tracking-wide">BSBTracker Portfolio</span>
         </Link>
-
-        <div className="flex space-x-4">
-          {navigation.map((item) => (
-            <Link
-              key={item.key}
-              to={item.href}
-              className="text-sm px-4 py-2 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+        <nav className="hidden gap-6 text-sm font-medium text-slate-600 md:flex">
+          {links.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              className={({ isActive }) =>
+                `transition-colors hover:text-blue-600 ${
+                  isActive ? "text-blue-600" : "text-slate-600"
+                }`
+              }
             >
-              {item.key.charAt(0).toUpperCase() + item.key.slice(1)}
-            </Link>
+              {link.label}
+            </NavLink>
           ))}
-        </div>
-      </nav>
-
-      {/* Sleek Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-200 shadow-lg z-50 flex justify-around items-center py-2">
-        {navigation.map((item) => {
-          const isActive = location.pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              onClick={() => navigate(item.href)}
-              className={`w-20 flex flex-col items-center justify-center gap-1 transition-all duration-200 px-2 py-1 rounded-md ${
-                isActive
-                  ? "text-blue-600 font-semibold bg-blue-50 shadow-md scale-105"
-                  : "text-gray-500 hover:text-blue-500 hover:bg-blue-50"
-              }`}
-            >
-              <Icon className="text-xl" />
-              <span className="text-xs capitalize">{item.key}</span>
-            </button>
-          );
-        })}
-      </nav>
-    </>
+        </nav>
+        <a
+          href="https://www.linkedin.com/"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden rounded-full border border-blue-500 px-4 py-1 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 md:inline-flex"
+        >
+          Connect
+        </a>
+      </div>
+    </header>
   );
 }
