@@ -1,18 +1,18 @@
-// Minimal stubs for demo builds
-export const supabase = null;
+import { users } from "./bsbtracker_mock_data";
+
+const demoUser = users[0] || null;
 
 export async function getCurrentUser() {
-  return null;
+  return demoUser;
 }
 
 export function onAuthStateChange(cb) {
-  // Immediately tell the app "no user", and return an unsubscribe
   try {
-    cb?.(null);
+    cb?.({ user: demoUser });
   } catch {}
   return () => {};
 }
 
 export async function signOut() {
-  return;
+  return true;
 }

@@ -15,9 +15,8 @@ export default function Events() {
       .then((data) => {
         setEvents(data);
       })
-      .catch((err) => console.error("Failed to fetch events:", err));
-
-    setLoading(false);
+      .catch((err) => console.error("Failed to fetch events:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <p className="text-center">Loading events...</p>;
