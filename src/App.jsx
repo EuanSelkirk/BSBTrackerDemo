@@ -22,6 +22,7 @@ import RoutePage from "./pages/loggedIn/Route";
 import Events from "./pages/loggedIn/Events";
 import Competition from "./pages/loggedIn/Competition";
 import TeamDetails from "./pages/loggedIn/TeamDetails";
+import Profile from "./pages/loggedIn/Profile";
 
 // NOTE: All admin imports have been removed
 
@@ -44,10 +45,7 @@ function AppRoutes() {
 
           {/* Demo: previously protected -> now public */}
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route
-            path="/profile"
-            element={<div>Profile disabled in demo</div>}
-          />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/section/:sectionId" element={<Section />} />
           <Route path="/route/:routeId" element={<RoutePage />} />
           <Route path="/events" element={<Events />} />
