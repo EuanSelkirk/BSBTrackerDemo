@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "../../data/supabaseClient";
 import RouteCard from "../../components/RouteCard";
+import { getSectionDetails } from "../../data/sections";
 
 export default function Section() {
   const { sectionId } = useParams();
@@ -16,94 +16,11 @@ export default function Section() {
     async function fetchData() {
       setLoading(true);
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-        if (userError || !user) throw new Error("User not authenticated");
-
-        // 1. Fetch section name
-        const { data: section, error: sectionErr } = await supabase
-          .from("sections")
-          .select("name")
-          .eq("section_id", sectionId)
-          .single();
-        if (sectionErr) throw sectionErr;
-        setSectionName(section.name);
-
-        // 2. Load route data for this user in this section from the view
-        const { data: viewData, error: viewErr } = await supabase
-          .from("user_section_event_scores")
-          .select(
-            `
-          route_id,
-          grade,
-          color,
-          image_url,
-          event_id,
-          max_points,
-          event_logo,
-          user_earned,
-          attempts,
-          top_num_per_set,
-          event_name
-        `
-          )
-          .eq("section_id", sectionId)
-          .eq("user_id", user.id);
-        if (viewErr) throw viewErr;
-
-        // 3. Process scored route data
-        const scoredRoutes = viewData.map((r) => ({
-          route_id: r.route_id,
-          grade: r.grade,
-          color: r.color,
-          image_url: r.image_url,
-          completed: r.attempts != null,
-          points: r.max_points || 0,
-          userEarned: r.user_earned || 0,
-          eventId: r.event_id,
-          compName: r.event_name || null,
-          eventLogo: r.event_logo || null,
-          topNum: r.top_num_per_set || null,
-        }));
-
-        // 4. Group by event and calculate score totals
-        const routesByEvent = {};
-        for (const r of scoredRoutes) {
-          if (!r.eventId) continue;
-          if (!routesByEvent[r.eventId]) routesByEvent[r.eventId] = [];
-          routesByEvent[r.eventId].push(r);
-        }
-
-        let totalUser = 0;
-        let totalMax = 0;
-
-        for (const eventId in routesByEvent) {
-          const group = routesByEvent[eventId];
-          const topNum = parseInt(group[0]?.topNum, 10) || 3;
-
-          // Top 3 by max possible points
-          const topMaxRoutes = [...group]
-            .sort((a, b) => b.points - a.points)
-            .slice(0, topNum);
-          totalMax += topMaxRoutes.reduce((sum, r) => sum + (r.points || 0), 0);
-
-          // Top 3 by earned points
-          const topUserRoutes = [...group]
-            .filter((r) => r.completed)
-            .sort((a, b) => (b.userEarned || 0) - (a.userEarned || 0))
-            .slice(0, topNum);
-
-          totalUser += topUserRoutes.reduce(
-            (sum, r) => sum + (r.userEarned || 0),
-            0
-          );
-        }
-
-        setUserPoints(totalUser);
-        setMaxPoints(totalMax);
-        setRoutes(scoredRoutes);
+        const data = await getSectionDetails(sectionId);
+        setSectionName(data.sectionName);
+        setRoutes(data.routes);
+        setUserPoints(data.userPoints);
+        setMaxPoints(data.maxPoints);
       } catch (err) {
         console.error(err);
         setError("Failed to load section data.");

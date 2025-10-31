@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "../../data/supabaseClient";
 import TeamBreakdown from "../../components/TeamBreakdown";
+import { getTeamDetails } from "../../data/competitions";
 
 export default function TeamDetails() {
   const { eventId, teamId } = useParams();
@@ -12,37 +12,18 @@ export default function TeamDetails() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const { data: teamData, error: teamError } = await supabase
-        .from("teams")
-        .select("*")
-        .eq("team_id", teamId)
-        .eq("competition_id", eventId)
-        .single();
-
-      if (!teamError) {
+      try {
+        const { team: teamData, members: membersData } = await getTeamDetails(
+          eventId,
+          teamId
+        );
         setTeam(teamData);
-      }
-
-      const { data: membersData, error: membersError } = await supabase
-        .from("team_member_scores")
-        .select(
-          `
-          user_id,
-          user_name,
-          average_score,
-          total_score,
-          user_email,
-          picture
-        `
-        )
-        .eq("team_id", teamId)
-        .eq("event_id", eventId);
-
-      if (!membersError) {
         setMembers(membersData);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     }
 
     if (teamId && eventId) {

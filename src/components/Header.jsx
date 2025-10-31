@@ -1,43 +1,19 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "../data/supabaseClient";
 import logo from "../assets/BlueSwan_Logo.jpg";
 import { FaHome, FaUser, FaCalendarAlt, FaTools } from "react-icons/fa";
+import { users } from "../data/bsbtracker_mock_data";
 
 export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [user] = useState(users[0] || null);
+  const [isAdmin] = useState(false);
 
   // Put this AFTER all hooks
   const hideHeader =
     location.pathname === "/" || location.pathname.startsWith("/leaderboard");
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
-      if (!error && user) {
-        setUser(user);
-        const { data, error: profileError } = await supabase
-          .from("users")
-          .select("is_admin")
-          .eq("id", user.id)
-          .single();
-
-        if (!profileError && data?.is_admin) {
-          setIsAdmin(true);
-        }
-      }
-    };
-
-    fetchUser();
-  }, []);
 
   if (hideHeader) return null;
 

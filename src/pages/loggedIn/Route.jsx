@@ -1,11 +1,16 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "../../data/supabaseClient";
 import { CheckCircle } from "lucide-react";
+import {
+  getRouteDetails,
+  getUserRouteAscent,
+  createUserRouteAscent,
+  updateUserRouteAscent,
+  deleteUserRouteAscent,
+} from "../../data/routes";
 
 export default function RoutePage() {
   const { routeId } = useParams();
-  const [userId, setUserId] = useState(null);
   const [routeDetails, setRouteDetails] = useState(null);
   const [ascentDetails, setAscentDetails] = useState(null);
   const [tries, setTries] = useState("");
@@ -25,61 +30,22 @@ export default function RoutePage() {
       setError("");
 
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        const details = await getRouteDetails(routeId);
+        if (!details) throw new Error("Route not found");
+        setRouteDetails(details);
 
-        if (userError || !user) {
-          setError("User not logged in");
-          setLoading(false);
-          return;
-        }
-
-        const uid = user.id;
-        setUserId(uid);
-
-        // --- Fetch route + event info ---
-        const { data: routeData, error: routeError } = await supabase
-          .from("route_with_event_info")
-          .select("*")
-          .eq("route_id", routeId)
-          .maybeSingle();
-
-        if (routeError) throw routeError;
-
-        setRouteDetails({
-          route_id: routeData.route_id,
-          grade: routeData.grade,
-          color: routeData.color,
-          image_url: routeData.image_url,
-          points: routeData.points,
-          event_id: routeData.event_id,
-          event_name: routeData.event_name,
-          event_logo: routeData.event_logo,
-          points_off_per_attempt: routeData.points_off_per_attempt,
-          max_points_off: routeData.max_points_off,
-          avg_or_cumulative: routeData.avg_or_cumulative,
-        });
-
-        // --- Fetch latest user ascent (if exists) ---
-        const { data: ascentData, error: ascentError } = await supabase
-          .from("latest_user_ascent")
-          .select("*")
-          .eq("user_id", uid)
-          .eq("route_id", routeId)
-          .maybeSingle();
-
-        if (ascentError) throw ascentError;
-
-        if (ascentData) {
+        const ascent = await getUserRouteAscent(routeId);
+        if (ascent) {
           setAscentDetails({
-            tries: ascentData.attempts || 0,
-            videoLink: ascentData.video_url || "",
-            created_at: ascentData.ascent_created_at || null,
-            is_valid: ascentData.is_valid,
-            invalid_reason: ascentData.invalid_reason,
+            tries: ascent.attempts,
+            videoLink: ascent.video_url || "",
+            created_at: ascent.created_at,
+            is_valid: ascent.is_valid,
+            invalid_reason: ascent.invalid_reason,
+            pointsEarned: ascent.points_earned ?? null,
           });
+          setTries(String(ascent.attempts ?? ""));
+          setVideoLink(ascent.video_url || "");
         } else {
           setAscentDetails(null);
         }
@@ -115,21 +81,18 @@ export default function RoutePage() {
     }
 
     try {
-      const { error: insertError } = await supabase.from("ascents").insert({
-        user_id: userId,
-        route_id: routeId,
-        attempts: tries,
+      const result = await createUserRouteAscent(routeId, {
+        attempts: Number(tries),
         video_url: videoLink.trim() || null,
       });
 
-      if (insertError) throw insertError;
-
       setAscentDetails({
-        tries,
-        videoLink: videoLink.trim(),
-        created_at: new Date().toISOString(),
-        is_valid: true,
-        invalid_reason: null,
+        tries: Number(tries),
+        videoLink: result.video_url || "",
+        created_at: result.created_at,
+        is_valid: result.is_valid,
+        invalid_reason: result.invalid_reason,
+        pointsEarned: result.points_earned ?? null,
       });
     } catch (err) {
       console.error("Failed to log ascent:", err);
@@ -146,17 +109,13 @@ export default function RoutePage() {
     }
 
     try {
-      const { error: updateError } = await supabase
-        .from("ascents")
-        .update({ video_url: videoLink.trim() || null })
-        .eq("user_id", userId)
-        .eq("route_id", routeId);
-
-      if (updateError) throw updateError;
+      const result = await updateUserRouteAscent(routeId, {
+        video_url: videoLink.trim() || null,
+      });
 
       setAscentDetails((prev) => ({
         ...prev,
-        videoLink: videoLink.trim(),
+        videoLink: result.video_url || "",
       }));
       setIsEditingLink(false);
     } catch (err) {
@@ -167,14 +126,7 @@ export default function RoutePage() {
 
   const handleDeleteAscent = async () => {
     try {
-      const { error: deleteError } = await supabase
-        .from("ascents")
-        .delete()
-        .eq("user_id", userId)
-        .eq("route_id", routeId);
-
-      if (deleteError) throw deleteError;
-
+      await deleteUserRouteAscent(routeId);
       setAscentDetails(null);
     } catch (err) {
       console.error("Failed to delete ascent:", err);
@@ -185,6 +137,8 @@ export default function RoutePage() {
   const getPointsEarned = () => {
     if (!routeDetails || !ascentDetails) return null;
     if (ascentDetails.is_valid === false) return 0;
+
+    if (ascentDetails.pointsEarned != null) return ascentDetails.pointsEarned;
 
     const { points, points_off_per_attempt, max_points_off } = routeDetails;
 
