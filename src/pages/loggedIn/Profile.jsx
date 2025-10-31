@@ -3,73 +3,108 @@ import { useNavigate } from "react-router-dom";
 import AscentsTab from "../../components/AscentsTab";
 import TeamsTab from "../../components/TeamsTab";
 
-const SAMPLE_USER = {
+import {
+  events,
+  routes,
+  sections,
+  sets,
+  teams,
+  users,
+} from "../../data/bsbtracker_mock_data";
+
+const DEFAULT_PROFILE_USER = {
   name: "Taylor Rivers",
   picture:
     "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=240&q=80",
   bio: "Community setter and weekend crusher.",
 };
 
-const SAMPLE_ASCENTS = [
-  {
-    ascent_id: "a-1",
-    route_id: "route-101",
-    image_url:
-      "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=400&q=80",
-    grade: "V6",
-    color: "Teal",
-    section_name: "North Wall",
-  },
-  {
-    ascent_id: "a-2",
-    route_id: "route-205",
-    image_url:
-      "https://images.unsplash.com/photo-1526481280695-3c46917b9d5d?auto=format&fit=crop&w=400&q=80",
-    grade: "V4",
-    color: "Purple",
-    section_name: "Prow Room",
-  },
-  {
-    ascent_id: "a-3",
-    route_id: "route-330",
-    image_url:
-      "https://images.unsplash.com/photo-1521151716396-bc1a2b349482?auto=format&fit=crop&w=400&q=80",
-    grade: "V7",
-    color: "Orange",
-    section_name: "Training Board",
-  },
-];
+const PROFILE_USER = (() => {
+  if (Array.isArray(users) && users.length > 0) {
+    const user = users[0];
+    return {
+      name: user.name || DEFAULT_PROFILE_USER.name,
+      picture: user.avatar_url || DEFAULT_PROFILE_USER.picture,
+      bio: `${
+        user.name || "This climber"
+      } is ready for the 2025 Bouldering League demo!`,
+    };
+  }
 
-const SAMPLE_TEAMS = [
-  {
-    teams: {
-      team_id: "team-44",
-      competition_id: "comp-boulder-brawl",
-      name: "Gravity Gals",
-      logo_url:
-        "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=160&q=80",
-      events: {
-        name: "Boulder Brawl Finals",
-        start_date: "2024-05-10",
-        end_date: "2024-05-12",
-      },
-    },
-  },
-  {
-    teams: {
-      team_id: "team-77",
-      competition_id: "comp-summer-slam",
-      name: "Campus Crushers",
-      logo_url:
-        "https://images.unsplash.com/photo-1502904550040-7534597429ae?auto=format&fit=crop&w=160&q=80",
-      events: {
-        name: "Summer Slam Showdown",
-        start_date: "2024-08-02",
-        end_date: "2024-08-04",
-      },
-    },
-  },
-];
+  return DEFAULT_PROFILE_USER;
+})();
+
+const SECTION_LOOKUP = new Map(
+  sections.map((section) => [section.section_id, section])
+);
+const SET_LOOKUP = new Map(sets.map((set) => [set.set_id, set]));
+const EVENT_LOOKUP = new Map(events.map((event) => [event.event_id, event]));
+
+const PREFERRED_ROUTE_IDS = ["224", "223", "222", "221", "220", "219"];
+const MAX_PROFILE_ASCENTS = 6;
+const MAX_PROFILE_TEAMS = 4;
+
+const getSectionNameForRoute = (route) => {
+  const parentSet = SET_LOOKUP.get(route.set_id);
+  if (!parentSet) return "Unknown";
+
+  const section = SECTION_LOOKUP.get(parentSet.section_id);
+  return section?.name ?? "Unknown";
+};
+
+const buildProfileAscents = () => {
+  if (!Array.isArray(routes)) return [];
+
+  const routeLookup = new Map(routes.map((route) => [route.route_id, route]));
+
+  const prioritizedRoutes = PREFERRED_ROUTE_IDS.map((routeId) =>
+    routeLookup.get(routeId)
+  ).filter(Boolean);
+
+  const fallbackRoutes = routes.filter(
+    (route) => route.image_url && !PREFERRED_ROUTE_IDS.includes(route.route_id)
+  );
+
+  const combinedRoutes = [...prioritizedRoutes, ...fallbackRoutes].slice(
+    0,
+    MAX_PROFILE_ASCENTS
+  );
+
+  return combinedRoutes.map((route) => ({
+    ascent_id: `ascent-${route.route_id}`,
+    route_id: route.route_id,
+    image_url: route.image_url,
+    grade: route.grade,
+    color: route.color,
+    section_name: getSectionNameForRoute(route),
+  }));
+};
+
+const buildProfileTeams = () => {
+  if (!Array.isArray(teams)) return [];
+
+  return teams
+    .filter((team) => team.display_on_leaderboard !== false)
+    .slice(0, MAX_PROFILE_TEAMS)
+    .map((team) => {
+      const event = EVENT_LOOKUP.get(team.competition_id);
+      return {
+        teams: {
+          ...team,
+          events: event
+            ? {
+                name: event.name,
+                start_date: event.start_date,
+                end_date: event.end_date,
+              }
+            : null,
+        },
+      };
+    });
+};
+
+const PROFILE_ASCENTS = buildProfileAscents();
+const PROFILE_TEAMS = buildProfileTeams();
 
 const parseVGrade = (gradeStr) => {
   if (!gradeStr || typeof gradeStr !== "string") return null;
@@ -82,15 +117,18 @@ const parseVGrade = (gradeStr) => {
 export default function Profile() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("ascents");
-  const [displayName, setDisplayName] = useState(SAMPLE_USER.name);
-  const [avatarUrl, setAvatarUrl] = useState(SAMPLE_USER.picture);
+  const [displayName, setDisplayName] = useState(PROFILE_USER.name);
+  const [avatarUrl, setAvatarUrl] = useState(PROFILE_USER.picture);
   const [avatarFileName, setAvatarFileName] = useState(null);
   const [showSavedNotification, setShowSavedNotification] = useState(false);
 
+  const profileAscents = PROFILE_ASCENTS;
+  const profileTeams = PROFILE_TEAMS;
+
   const ascentStats = useMemo(() => {
-    const numericGrades = SAMPLE_ASCENTS.map((ascent) =>
-      parseVGrade(ascent.grade)
-    ).filter((grade) => grade !== null);
+    const numericGrades = profileAscents
+      .map((ascent) => parseVGrade(ascent.grade))
+      .filter((grade) => grade !== null);
 
     if (numericGrades.length === 0) {
       return { count: 0, max: "–", avg: "–" };
@@ -102,8 +140,8 @@ export default function Profile() {
       numericGrades.length
     ).toFixed(1);
 
-    return { count: SAMPLE_ASCENTS.length, max: `V${max}`, avg: `V${avg}` };
-  }, []);
+    return { count: profileAscents.length, max: `V${max}`, avg: `V${avg}` };
+  }, [profileAscents]);
 
   const handleSave = () => {
     setShowSavedNotification(true);
@@ -138,7 +176,7 @@ export default function Profile() {
               Ascents: {ascentStats.count} | Max: {ascentStats.max} | Avg:{" "}
               {ascentStats.avg}
             </div>
-            <p className="text-gray-600 text-sm mt-1">{SAMPLE_USER.bio}</p>
+            <p className="text-gray-600 text-sm mt-1">{PROFILE_USER.bio}</p>
           </div>
         </div>
 
@@ -161,9 +199,9 @@ export default function Profile() {
         </div>
 
         <div className="-mx-4">
-          {activeTab === "ascents" && <AscentsTab ascents={SAMPLE_ASCENTS} />}
+          {activeTab === "ascents" && <AscentsTab ascents={profileAscents} />}
           {activeTab === "teams" && (
-            <TeamsTab teams={SAMPLE_TEAMS} navigate={navigate} />
+            <TeamsTab teams={profileTeams} navigate={navigate} />
           )}
           {activeTab === "settings" && (
             <div className="bg-white rounded-b-lg shadow p-6 max-w-md mx-auto space-y-6">
@@ -222,21 +260,7 @@ export default function Profile() {
                   placeholder="Change Name Here"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preferred Grades
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {["V3-V4", "V5-V6", "Endurance"]?.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
+
               <div className="space-y-2">
                 <button
                   onClick={handleSave}
